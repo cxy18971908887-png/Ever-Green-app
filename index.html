@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ever Green App</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FIX: Define process env to prevent library errors -->
+    <script>window.process = { env: { NODE_ENV: 'production' } };</script>
+
+    <!-- React & ReactDOM (Production) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        
+        /* Animations */
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .animate-slide-up { animation: slideUp 0.3s ease-out forwards; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .animate-slide-in-right { animation: slideInRight 0.3s ease-out forwards; }
+        @keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+        .animate-bounce-slow { animation: bounce 2s infinite; }
+        
+        /* Hide Scrollbar but allow scrolling */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        // === LOCAL ICON SYSTEM (No CDN dependency) ===
+        // 1. The Generic Icon Component Wrapper
+        const IconWrapper = ({ path, size = 24, className = "", ...props }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+                {...props}
+            >
+                <g dangerouslySetInnerHTML={{ __html: path }} />
+            </svg>
+        );
+
+        // 2. The Raw SVG Data
+        const IconsData = {
+            Home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+            Calendar: '<rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>',
+            BookOpen: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+            User: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+            Star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+            MapPin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+            Clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+            ChevronRight: '<path d="m9 18 6-6-6-6"/>',
+            Heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+            ArrowLeft: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+            CheckCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+            X: '<path d="M18 6 6 18"/><path d="M6 6 18 18"/>',
+            MessageCircle: '<path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/>',
+            FileText: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/>',
+            Bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+            Smile: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/>',
+            Frown: '<circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/>',
+            Meh: '<circle cx="12" cy="12" r="10"/><line x1="8" x2="16" y1="15" y2="15"/><line x1="9" x2="9.01" y1="9" y2="9"/><line x1="15" x2="15.01" y1="9" y2="9"/>',
+            Video: '<path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/>',
+            Users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+            Award: '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+            Phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+            Settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.35a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+            CreditCard: '<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>',
+            ImageIcon: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+            ThumbsUp: '<path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/>',
+            ScanFace: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="10" height="8" x="7" y="8" rx="1"/>',
+            Coffee: '<path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><line x1="6" x2="6" y1="2" y2="4"/>',
+            Wine: '<path d="M8 22h8"/><path d="M7 10h10"/><path d="M12 15v7"/><path d="M12 15a5 5 0 0 0 5-5c0-2-.5-4-2-8H9c-1.5 4-2 6-2 8a5 5 0 0 0 5 5Z"/>',
+            Sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+            Flower: '<path d="M12 7.5a4.5 4.5 0 1 1 4.5 4.5M12 7.5A4.5 4.5 0 1 0 7.5 12M12 7.5V9m-4.5 3a4.5 4.5 0 1 0 4.5 4.5M7.5 12H9m3 4.5a4.5 4.5 0 1 0 4.5-4.5M12 16.5V15m4.5-3H15"/><circle cx="12" cy="12" r="3"/><path d="m8 16 8-8"/>',
+            PlayCircle: '<circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>',
+            Mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>',
+            PhoneCall: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/><path d="M14.05 2a9 9 0 0 1 8 7.94"/><path d="M14.05 6A5 5 0 0 1 18 10"/>',
+            ZoomIn: '<circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/><line x1="11" x2="11" y1="8" y2="14"/><line x1="8" x2="14" y1="11" y2="11"/>',
+            Type: '<polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/>',
+            ToggleLeft: '<rect width="20" height="12" x="2" y="6" rx="6" ry="6"/><circle cx="8" cy="12" r="2"/>',
+            ToggleRight: '<rect width="20" height="12" x="2" y="6" rx="6" ry="6"/><circle cx="16" cy="12" r="2"/>',
+            ShieldCheck: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/>',
+            Layers: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+            Crown: '<path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/>',
+            PhoneOff: '<path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/><line x1="22" x2="2" y1="2" y2="22"/>',
+            MicOff: '<line x1="2" x2="22" y1="2" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 5"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/><line x1="12" x2="12" y1="19" y2="22"/>',
+            Volume2: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
+            TreeDeciduous: '<path d="M8 19a4 4 0 0 1-2.24-7.4 3.6 3.6 0 0 1 1.01-3.9 4.5 4.5 0 0 1 8.65 1.38 3.5 3.5 0 0 1 1.86 6.64A4 4 0 0 1 14 21H8Z"/><path d="M12 21v-4"/>',
+            BarChart3: '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+            Briefcase: '<rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+            PenTool: '<path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/>',
+            Wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+            Utensils: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+            Car: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+            Receipt: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17V7"/>',
+            ClipboardList: '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>'
+        };
+
+        // 3. Transform Icon Map to React Components
+        const lucideIcons = Object.keys(IconsData).reduce((acc, key) => {
+            acc[key] = (props) => <IconWrapper path={IconsData[key]} {...props} />;
+            return acc;
+        }, {});
+
+        // Add aliases
+        lucideIcons.Image = lucideIcons.ImageIcon = (props) => <IconWrapper path='<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>' {...props} />;
+
+        // Destructure all icons
+        const { 
+            Home, Calendar, BookOpen, User, Star, MapPin, Clock, ChevronRight, Heart, 
+            ArrowLeft, CheckCircle, X, MessageCircle, FileText,
+            Bell, Smile, Frown, Meh, Video, Users, Award, Phone, Settings, CreditCard, 
+            ImageIcon, ThumbsUp, ScanFace, Coffee, Wine, Sun, Flower, PlayCircle,
+            Mic, PhoneCall, ZoomIn, Type, ToggleLeft, ToggleRight, ShieldCheck, Layers, Crown,
+            PhoneOff, MicOff, Volume2, TreeDeciduous, BarChart3, Briefcase, PenTool,
+            Wrench, Utensils, Car, Receipt, ClipboardList
+        } = lucideIcons;
+
+        // === Image Component ===
+        const ImageWithFallback = ({ src, alt, className, icon: IconComponent = ImageIcon, fallbackColor = "bg-slate-200" }) => {
+            const [error, setError] = useState(false);
+            if (error || !src) {
+                return (
+                    <div className={`${className} ${fallbackColor} flex items-center justify-center text-slate-400`}>
+                        <IconComponent size={32} strokeWidth={1.5} />
+                    </div>
+                );
+            }
+            return <img src={src} alt={alt} className={className} onError={() => setError(true)} />;
+        };
+
+        // === Mock Data ===
+        const ACTIVITIES = [
+            {
+                id: 1,
+                title: "Morning Chair Yoga (Online)",
+                type: "online", 
+                tier: "Tier 1", 
+                category: "Health",
+                time: "09:00 - 09:45",
+                date: "Daily",
+                location: "Zoom Live Room",
+                image: "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=800&auto=format&fit=crop&q=60",
+                description: "A gentle stretching class designed for seniors. No mat needed, soothe your joints from the comfort of a chair and start your day full of vitality.",
+                price: "Included in Basic",
+                icon: Video
+            },
+            {
+                id: 2,
+                title: "Community Lawn Bowls Social",
+                type: "offline", 
+                tier: "Tier 2", 
+                category: "Social",
+                time: "14:00 - 16:30",
+                date: "Wed Oct 24",
+                location: "Community Lawn Bowls Club",
+                image: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&auto=format&fit=crop&q=60", 
+                description: "A classic Aussie social sport! All skill levels welcome. Free afternoon tea and scones provided after the game.",
+                price: "Included in Advanced",
+                icon: Sun
+            },
+            {
+                id: 3,
+                title: "Yarra Valley Winery Exclusive Tour",
+                type: "premium", 
+                tier: "Tier 3", 
+                category: "Premium Outing",
+                time: "09:00 - 17:00",
+                date: "Sat Oct 27",
+                location: "Meeting Point: Community Lobby",
+                image: "https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?w=800&auto=format&fit=crop&q=60",
+                description: "High-end custom itinerary, including return private transfers, tastings at three top wineries (Chandon, Rochford), and a two-course estate lunch. Extra cost applies.",
+                price: "$120",
+                icon: Wine
+            },
+            {
+                id: 4,
+                title: "Aussie Native Plant Gardening Workshop",
+                type: "online", 
+                tier: "Tier 1", 
+                category: "Gardening",
+                time: "10:30 - 11:30",
+                date: "Fri Oct 26",
+                location: "Online Live Room",
+                image: "https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=800&auto=format&fit=crop&q=60",
+                description: "Special guest horticulturist from the Royal Botanic Gardens explains how to grow drought-tolerant Aussie native flowers in your own backyard for an easy-care garden.",
+                price: "Included in Basic",
+                icon: Flower
+            },
+            {
+                id: 5,
+                title: "Australia Day BBQ Party",
+                type: "offline",
+                tier: "Tier 2", 
+                category: "Social",
+                time: "11:00 - 14:00",
+                date: "Sat Jan 26",
+                location: "Central Park BBQ Area",
+                image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format&fit=crop&q=60",
+                description: "Join us for a traditional Aussie BBQ! Sausages, lamb chops, and lamingtons provided. Bring your own beverages and a rug.",
+                price: "Included in Advanced",
+                icon: Sun
+            },
+            {
+                id: 6,
+                title: "Smartphone Skills Workshop (Offline)",
+                type: "offline",
+                tier: "Tier 1",
+                category: "Digital Skills",
+                time: "15:00 - 16:30",
+                date: "Thu Oct 25",
+                location: "Community Center Room A",
+                image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&auto=format&fit=crop&q=60",
+                description: "Face-to-face workshop. Learn how to use WhatsApp to call your grandchildren and how to spot SMS scams. Staff will help you hands-on.",
+                price: "Included in Basic",
+                icon: Users
+            }
+        ];
+
+        const INITIAL_POSTS = [
+            {
+                id: 1,
+                user: "Mr. Zhang",
+                avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Bob",
+                time: "2 hours ago",
+                content: "The weather is great today! Had a BBQ in the backyard, grilled some lamb chops, tasted delicious! Have a great weekend everyone! 🌭",
+                image: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format&fit=crop&q=60",
+                likes: 15,
+                isLiked: false
+            },
+            {
+                id: 2,
+                user: "Mrs. Li",
+                avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alice",
+                time: "4 hours ago",
+                content: "Just finished Bingo night, lucky enough to win a small bag of coffee beans! ☕️",
+                image: "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?w=800&auto=format&fit=crop&q=60",
+                likes: 32,
+                isLiked: false
+            }
+        ];
+
+        const INITIAL_SCHEDULE = [
+            { id: 101, activityId: 1, status: "upcoming", rated: false }
+        ];
+
+        // === Helper Functions ===
+        const getTierBadgeStyle = (tier) => {
+            switch(tier) {
+                case 'Tier 1': return 'bg-orange-100 text-orange-700';
+                case 'Tier 2': return 'bg-purple-100 text-purple-700';
+                case 'Tier 3': return 'bg-yellow-100 text-yellow-800';
+                default: return 'bg-slate-100 text-slate-600';
+            }
+        };
+
+        // === MAIN APP ===
+        function EverGreenApp() {
+            const [activeTab, setActiveTab] = useState('home');
+            const [showSplash, setShowSplash] = useState(true);
+            const [currentView, setCurrentView] = useState('main');
+            const [selectedActivity, setSelectedActivity] = useState(null);
+            const [callTarget, setCallTarget] = useState("Health Assistant");
+            const [schedule, setSchedule] = useState(INITIAL_SCHEDULE);
+            const [showSuccessModal, setShowSuccessModal] = useState(false);
+            const [healthStatus, setHealthStatus] = useState(null);
+            const [posts, setPosts] = useState(INITIAL_POSTS);
+            const [buddyStatus, setBuddyStatus] = useState("initial");
+            const [formSubmitted, setFormSubmitted] = useState(false);
+            const [fontSize, setFontSize] = useState('Normal');
+            const [familyMembers, setFamilyMembers] = useState([
+                { id: 1, name: "Daughter (Sarah)", access: true },
+                { id: 2, name: "Husband (David)", access: true },
+                { id: 3, name: "Son (Michael)", access: false },
+            ]);
+
+            const handleLogin = () => { setTimeout(() => setShowSplash(false), 1500); };
+            
+            const goHome = () => { setCurrentView('main'); setSelectedActivity(null); };
+            const openDetail = (activity) => { setSelectedActivity(activity); setCurrentView('detail'); };
+            const openLiveRoom = () => setCurrentView('live-room');
+            const openTier1List = () => setCurrentView('tier1-list');
+            const openTier2List = () => setCurrentView('tier2-list');
+            const openFontSettings = () => setCurrentView('font-settings');
+            const openFamilyAccess = () => setCurrentView('family-access');
+            const openDataReport = () => setCurrentView('data-report');
+            const openAdminService = () => setCurrentView('admin-service');
+            const openHostActivity = () => { setFormSubmitted(false); setCurrentView('host-activity'); };
+            const handleCall = (target) => { setCallTarget(target); setCurrentView('calling'); };
+            const handleEndCall = () => setCurrentView('main');
+
+            const handleBooking = (activity) => {
+                const newBooking = { id: Date.now(), activityId: activity.id, status: 'upcoming', rated: false };
+                setSchedule([...schedule, newBooking]);
+                setCurrentView('main');
+                setShowSuccessModal(true);
+                setTimeout(() => setShowSuccessModal(false), 2000);
+            };
+
+            const toggleLike = (postId) => {
+                setPosts(posts.map(p => p.id === postId ? { ...p, likes: p.isLiked ? p.likes - 1 : p.likes + 1, isLiked: !p.isLiked } : p));
+            };
+            
+            const toggleFamilyAccess = (id) => {
+                setFamilyMembers(familyMembers.map(m => m.id === id ? { ...m, access: !m.access } : m));
+            };
+
+            const premiumTickets = schedule.map(s => ACTIVITIES.find(a => a.id === s.activityId)).filter(a => a && a.type === 'premium');
+
+            const NavItem = ({ icon: Icon, label, id }) => (
+                <button onClick={() => { setActiveTab(id); setCurrentView('main'); }} className={`flex flex-col items-center justify-center w-full py-3 ${activeTab === id ? 'text-emerald-700' : 'text-slate-400'}`}>
+                    <Icon size={28} strokeWidth={activeTab === id ? 2.5 : 2} />
+                    <span className={`text-xs mt-1.5 ${activeTab === id ? 'font-bold' : 'font-medium'}`}>{label}</span>
+                </button>
+            );
+
+            // === SPLASH SCREEN ===
+            if (showSplash) {
+                return (
+                    <div className="bg-gradient-to-br from-emerald-600 to-teal-800 min-h-screen flex flex-col justify-between items-center text-white relative overflow-hidden max-w-xl mx-auto shadow-2xl">
+                        <div className="absolute top-[-100px] right-[-100px] w-64 h-64 bg-white opacity-5 rounded-full"></div>
+                        <div className="absolute bottom-[-50px] left-[-50px] w-48 h-48 bg-white opacity-5 rounded-full"></div>
+                        <div className="h-20 w-full"></div>
+                        <div className="z-10 flex flex-col items-center animate-fade-in w-full px-8">
+                            <div className="bg-white p-6 rounded-full shadow-2xl mb-8 transform hover:scale-105 transition-transform duration-500 flex items-center justify-center">
+                                <TreeDeciduous size={72} className="text-emerald-600" />
+                            </div>
+                            <h1 className="text-4xl font-bold mb-2 tracking-wide drop-shadow-md">Ever Green</h1>
+                            <p className="text-emerald-100 text-xl italic mb-12 drop-shadow-sm">Meaningful Engagement</p>
+                            <div className="bg-white/10 backdrop-blur-md p-8 rounded-2xl border border-white/20 w-full text-center shadow-2xl">
+                                <div className="w-20 h-20 mx-auto bg-emerald-800 rounded-full flex items-center justify-center mb-4 animate-pulse ring-4 ring-emerald-500/30">
+                                    <ScanFace size={40} />
+                                </div>
+                                <h3 className="text-xl font-bold mb-2">Face ID Scanning...</h3>
+                                <p className="text-emerald-100 text-base">Welcome home, Mrs. Wang</p>
+                                <button onClick={handleLogin} className="mt-6 bg-white text-emerald-800 px-8 py-3 rounded-full font-bold text-lg shadow-lg w-full active:scale-95 transition-transform hover:bg-emerald-50">
+                                    One-Click Login
+                                </button>
+                            </div>
+                        </div>
+                        <div className="mb-8 text-center z-10 opacity-60">
+                            <div className="flex items-center justify-center gap-2 mb-1">
+                                <ShieldCheck size={16} />
+                                <span className="text-sm font-medium">Secure & Private</span>
+                            </div>
+                            <p className="text-xs">v1.0.3 • Powered by Ever Green Technology</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            // === DETAIL VIEW ===
+            if (currentView === 'detail' && selectedActivity) {
+                const isBooked = schedule.some(s => s.activityId === selectedActivity.id);
+                return (
+                    <div className="bg-orange-50 min-h-screen flex flex-col font-sans max-w-xl mx-auto shadow-2xl">
+                        <div className="relative h-64">
+                            <ImageWithFallback src={selectedActivity.image} className="w-full h-full object-cover" alt={selectedActivity.title} icon={selectedActivity.icon} fallbackColor="bg-emerald-100" />
+                            <button onClick={() => setCurrentView('main')} className="absolute top-4 left-4 bg-white/90 p-3 rounded-full shadow-lg text-emerald-800 hover:bg-white"><ArrowLeft size={28} /></button>
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6">
+                                <div className="flex gap-2 mb-3">
+                                    <span className={`${getTierBadgeStyle(selectedActivity.tier)} px-4 py-1.5 rounded-full text-base font-bold shadow-sm`}>{selectedActivity.tier}</span>
+                                    <span className="bg-white text-slate-800 px-4 py-1.5 rounded-full text-base font-medium shadow-sm">{selectedActivity.price}</span>
+                                </div>
+                                <h2 className="text-white text-3xl font-bold drop-shadow-md">{selectedActivity.title}</h2>
+                            </div>
+                        </div>
+                        <div className="p-6 flex-1 bg-white rounded-t-3xl -mt-6 relative z-10 pb-24 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+                            <div className="flex items-start gap-4 mb-6"><div className="bg-orange-100 p-3 rounded-xl text-orange-600"><Clock size={28} /></div><div><p className="text-slate-500 text-base">Time</p><p className="text-slate-800 font-semibold text-xl">{selectedActivity.date}</p><p className="text-slate-800 text-xl">{selectedActivity.time}</p></div></div>
+                            <div className="flex items-start gap-4 mb-6"><div className="bg-blue-100 p-3 rounded-xl text-blue-600"><MapPin size={28} /></div><div><p className="text-slate-500 text-base">Location</p><p className="text-slate-800 font-semibold text-xl">{selectedActivity.location}</p></div></div>
+                            <div className="mb-10"><h3 className="text-2xl font-bold text-slate-800 mb-4">About Activity</h3><p className="text-slate-600 leading-relaxed text-xl">{selectedActivity.description}</p></div>
+                            <button onClick={() => !isBooked && handleBooking(selectedActivity)} disabled={isBooked} className={`w-full py-5 rounded-2xl text-2xl font-bold shadow-lg transition-all ${isBooked ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'}`}>{isBooked ? 'Booked' : `Book Now (${selectedActivity.price})`}</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // === LIVE ROOM VIEW ===
+            if (currentView === 'live-room') {
+                return (
+                    <div className="bg-black min-h-screen flex flex-col max-w-xl mx-auto relative shadow-2xl">
+                        <div className="absolute top-0 left-0 right-0 p-4 z-10 flex justify-between items-center bg-gradient-to-b from-black/70 to-transparent">
+                            <button onClick={goHome} className="text-white p-2 rounded-full bg-black/20 backdrop-blur-sm"><ChevronRight className="rotate-180" size={28} /></button>
+                            <div className="bg-red-600 px-3 py-1 rounded-full flex items-center gap-2"><span className="w-2 h-2 bg-white rounded-full animate-pulse"></span><span className="text-white text-xs font-bold">LIVE</span></div>
+                        </div>
+                        <div className="flex-1 flex items-center justify-center bg-slate-900 relative">
+                            <img src="https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=800&auto=format&fit=crop&q=60" className="absolute inset-0 w-full h-full object-cover opacity-60" alt="Gardening" />
+                            <div className="z-10 text-center p-6"><PlayCircle size={64} className="text-white mx-auto mb-4 opacity-80" /><h2 className="text-white text-2xl font-bold">Aussie Native Gardening</h2><p className="text-slate-300 mt-2">Host: Royal Botanic Gardens</p></div>
+                            <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black to-transparent">
+                                <div className="flex gap-3 overflow-x-auto pb-4"><span className="bg-black/40 text-white px-3 py-1 rounded-full text-sm backdrop-blur-md border border-white/10">👋 Hello everyone!</span><span className="bg-black/40 text-white px-3 py-1 rounded-full text-sm backdrop-blur-md border border-white/10">🌱 Great tips!</span></div>
+                                <div className="flex items-center gap-3"><input type="text" placeholder="Say something..." className="flex-1 bg-white/20 backdrop-blur-md rounded-full px-4 py-3 text-white placeholder-slate-300 outline-none border border-white/10" /><button className="bg-emerald-600 p-3 rounded-full text-white"><Heart size={24} fill="currentColor" /></button></div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // === CALLING VIEW ===
+            if (currentView === 'calling') {
+                return (
+                    <div className="bg-slate-900 min-h-screen flex flex-col items-center justify-between max-w-xl mx-auto py-12 relative overflow-hidden shadow-2xl">
+                        <div className="absolute inset-0 bg-gradient-to-b from-slate-800 to-black opacity-90 z-0"></div>
+                        <div className="z-10 flex flex-col items-center mt-10">
+                            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-slate-700 shadow-2xl mb-6 bg-slate-200 flex items-center justify-center">
+                                {callTarget === "Health Assistant" ? <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=800&auto=format&fit=crop&q=60" alt="Nurse" className="w-full h-full object-cover" /> : <Briefcase size={48} className="text-slate-500" />}
+                            </div>
+                            <h2 className="text-3xl text-white font-bold mb-2">{callTarget}</h2>
+                            <p className="text-emerald-400 text-lg animate-pulse">Connecting...</p>
+                        </div>
+                        <div className="z-10 w-full px-12 mb-8">
+                            <div className="flex justify-between mb-16">
+                                <div className="flex flex-col items-center gap-2"><div className="w-16 h-16 rounded-full bg-slate-700/50 backdrop-blur-md flex items-center justify-center text-white hover:bg-slate-600 transition-colors"><MicOff size={28} /></div><span className="text-slate-400 text-sm">Mute</span></div>
+                                <div className="flex flex-col items-center gap-2"><div className="w-16 h-16 rounded-full bg-slate-700/50 backdrop-blur-md flex items-center justify-center text-white hover:bg-slate-600 transition-colors"><Volume2 size={28} /></div><span className="text-slate-400 text-sm">Speaker</span></div>
+                                <div className="flex flex-col items-center gap-2"><div className="w-16 h-16 rounded-full bg-slate-700/50 backdrop-blur-md flex items-center justify-center text-white hover:bg-slate-600 transition-colors"><Video size={28} /></div><span className="text-slate-400 text-sm">Video</span></div>
+                            </div>
+                            <button onClick={handleEndCall} className="w-full bg-red-500 hover:bg-red-600 text-white py-5 rounded-full text-xl font-bold shadow-lg flex items-center justify-center gap-3 transition-transform active:scale-95"><PhoneOff size={28} fill="currentColor" />End Call</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // === OTHER SUB-VIEWS (Lists, Reports, Forms) ===
+            if (['tier1-list', 'tier2-list', 'font-settings', 'family-access', 'data-report', 'admin-service', 'host-activity'].includes(currentView)) {
+                let content, title;
+                const backBtn = <button onClick={() => setCurrentView('main')} className="p-2 hover:bg-slate-100 rounded-full"><ArrowLeft /></button>;
+                
+                if (currentView === 'tier1-list') {
+                    title = "Tier 1: Basic";
+                    content = <div className="p-5 space-y-4">{ACTIVITIES.filter(a => a.tier === 'Tier 1').map(activity => (
+                        <div key={activity.id} onClick={() => openDetail(activity)} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex gap-4 active:scale-[0.98] transition-transform">
+                            <div className="w-24 h-24 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0 overflow-hidden"><ImageWithFallback src={activity.image} className="w-full h-full object-cover" alt={activity.title} icon={activity.icon} fallbackColor="bg-orange-100" /></div>
+                            <div className="flex-1"><h3 className="font-bold text-slate-800 text-lg leading-tight mb-1">{activity.title}</h3><div className="flex gap-2 mb-2"><span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-md font-bold">Tier 1</span></div><p className="text-slate-500 text-sm">{activity.date} • {activity.time}</p></div><ChevronRight className="text-slate-300 self-center" />
+                        </div>))}</div>;
+                } else if (currentView === 'tier2-list') {
+                    title = "Tier 2: Advanced";
+                    content = <div className="p-5 space-y-4">{ACTIVITIES.filter(a => a.tier === 'Tier 2').map(activity => (
+                        <div key={activity.id} onClick={() => openDetail(activity)} className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 active:scale-[0.98] transition-transform"><div className="flex justify-between items-start mb-2"><h3 className="font-bold text-slate-800 text-lg flex-1">{activity.title}</h3><span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-md font-bold whitespace-nowrap">Tier 2</span></div><div className="w-full h-32 rounded-xl overflow-hidden mb-3"><ImageWithFallback src={activity.image} className="w-full h-full object-cover" alt={activity.title} icon={activity.icon} fallbackColor="bg-purple-100" /></div><div className="space-y-2"><div className="flex items-center gap-3 text-slate-600"><Clock size={18} className="text-purple-500" /><span className="font-medium">{activity.date}, {activity.time}</span></div><div className="flex items-center gap-3 text-slate-600"><MapPin size={18} className="text-purple-500" /><span className="font-medium">{activity.location}</span></div></div></div>))}</div>;
+                } else if (currentView === 'data-report') {
+                    title = "Weekly Report";
+                    content = <div className="p-6 overflow-y-auto pb-20"><div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-6 text-white shadow-lg mb-6"><div className="flex justify-between items-start"><div><p className="text-emerald-100 mb-1">Engagement Score</p><h3 className="text-4xl font-bold">92<span className="text-xl font-normal">/100</span></h3></div><div className="bg-white/20 p-2 rounded-lg"><BarChart3 size={24} /></div></div><p className="mt-4 text-sm text-emerald-100">Top 15% in community!</p></div><div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-6"><h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><BookOpen size={20} className="text-blue-500" /> Learning Progress</h3><div className="space-y-4"><div><div className="flex justify-between text-sm mb-1"><span className="text-slate-700">Digital Skills L1</span><span className="text-slate-500">80%</span></div><div className="w-full bg-slate-100 rounded-full h-2.5"><div className="bg-blue-500 h-2.5 rounded-full w-[80%]"></div></div></div><div><div className="flex justify-between text-sm mb-1"><span className="text-slate-700">Garden Design</span><span className="text-slate-500">45%</span></div><div className="w-full bg-slate-100 rounded-full h-2.5"><div className="bg-green-500 h-2.5 rounded-full w-[45%]"></div></div></div></div></div><div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-6"><h3 className="font-bold text-slate-800 mb-4">Daily Activity Trend</h3><div className="flex items-end justify-between h-32 gap-2">{['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => { const heights = ['40%', '60%', '30%', '80%', '50%', '90%', '70%']; return (<div key={i} className="flex flex-col items-center gap-2 flex-1"><div className="w-full bg-emerald-100 rounded-t-md relative group" style={{height: heights[i]}}><div className="absolute bottom-0 left-0 right-0 bg-emerald-500 rounded-t-md transition-all duration-500" style={{height: '100%'}}></div></div><span className="text-xs text-slate-400">{day}</span></div>)})}</div></div></div>;
+                } else if (currentView === 'admin-service') {
+                    title = "Concierge Desk";
+                    content = <div className="p-6 overflow-y-auto"><div className="bg-purple-600 rounded-2xl p-6 text-white shadow-lg mb-8"><h3 className="text-2xl font-bold mb-2">How can we help?</h3><p className="text-purple-100">We handle the small things.</p></div><h3 className="font-bold text-slate-700 mb-4 px-1">Quick Services</h3><div className="grid grid-cols-2 gap-4 mb-8">{[{icon:Wrench,l:"Maintenance",c:"text-orange-600",b:"bg-orange-100"},{icon:Utensils,l:"Meal Booking",c:"text-blue-600",b:"bg-blue-100"},{icon:Car,l:"Transport",c:"text-green-600",b:"bg-green-100"},{icon:Receipt,l:"Bills Help",c:"text-pink-600",b:"bg-pink-100"}].map((s,i)=><div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center gap-3 active:scale-95 transition-transform cursor-pointer"><div className={`w-12 h-12 rounded-full ${s.b} flex items-center justify-center ${s.c}`}><s.icon size={24}/></div><span className="font-medium text-slate-700">{s.l}</span></div>)}</div><button onClick={() => handleCall("Concierge Desk")} className="w-full bg-slate-800 text-white py-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-transform"><Phone size={20} /> Call Concierge</button></div>;
+                } else if (currentView === 'host-activity') {
+                    title = "Host an Activity";
+                    content = <div className="p-6">{!formSubmitted ? <div className="space-y-6"><div className="bg-purple-50 p-4 rounded-xl border border-purple-100 mb-4"><p className="text-purple-800 text-sm font-medium">Share your passion!</p></div><div><label className="block text-slate-700 font-bold mb-2 text-lg">Title</label><input type="text" className="w-full p-4 rounded-xl border border-slate-200 bg-white text-lg outline-none" placeholder="e.g. Knitting Club" /></div><button onClick={() => setFormSubmitted(true)} className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-xl shadow-lg mt-4 active:scale-95">Submit Proposal</button></div> : <div className="flex flex-col items-center justify-center h-[60vh] text-center animate-fade-in"><div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-6"><CheckCircle size={48} /></div><h3 className="text-2xl font-bold text-slate-800 mb-2">Thank You!</h3><p className="text-slate-500 text-lg">Proposal sent.</p><button onClick={goHome} className="mt-8 text-purple-600 font-bold text-lg">Back to Home</button></div>}</div>;
+                } else if (currentView === 'family-access') {
+                    title = "Family Access";
+                    content = <div className="p-6"><div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">{familyMembers.map(member => <div key={member.id} className="flex items-center justify-between p-5 border-b border-slate-50 last:border-0"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center text-pink-600 font-bold">{member.name[0]}</div><span className="text-lg text-slate-700 font-medium">{member.name}</span></div><button onClick={() => toggleFamilyAccess(member.id)} className="text-emerald-500"><ToggleRight size={40} fill={member.access ? "currentColor" : "none"} className={member.access ? "" : "text-slate-300"} /></button></div>)}</div><button className="mt-6 w-full py-4 border-2 border-dashed border-slate-300 text-slate-500 rounded-xl font-bold flex items-center justify-center gap-2"><Users size={20} /> Invite New Member</button></div>;
+                } else {
+                    title = "Text Size";
+                    content = <div className="p-6"><div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">{['Normal', 'Large', 'Extra Large', 'Super Big'].map(size => <button key={size} onClick={() => setFontSize(size)} className="w-full flex items-center justify-between p-6 border-b border-slate-50 last:border-0 hover:bg-slate-50"><span className={`text-slate-700 ${size === 'Normal' ? 'text-base' : size === 'Large' ? 'text-xl' : size === 'Extra Large' ? 'text-2xl' : 'text-3xl'}`}>{size}</span>{fontSize === size && <CheckCircle className="text-emerald-600" size={24} />}</button>)}</div><p className="text-center text-slate-400 mt-6">Preview text size.</p></div>;
+                }
+                return (<div className="bg-slate-50 min-h-screen flex flex-col max-w-xl mx-auto shadow-2xl"><div className="bg-white p-4 flex items-center gap-4 shadow-sm">{backBtn}<h2 className="text-xl font-bold text-slate-800">{title}</h2></div>{content}</div>);
+            }
+
+            // === MAIN VIEW ===
+            return (
+                <div className="bg-slate-50 min-h-screen flex flex-col max-w-xl mx-auto shadow-2xl relative overflow-hidden">
+                    <div className="bg-emerald-600 h-14 w-full flex items-center justify-between px-5 shadow-md z-20">
+                        <span className="text-emerald-100 text-sm font-semibold">Ever Green Life</span>
+                        <div className="flex items-center gap-3 text-white relative"><Bell size={22} /><span className="bg-red-500 w-2.5 h-2.5 rounded-full absolute top-0 right-0"></span></div>
+                    </div>
+
+                    {showSuccessModal && <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"><div className="bg-white p-8 rounded-2xl flex flex-col items-center animate-bounce-in shadow-2xl w-80 text-center"><div className="bg-green-100 p-5 rounded-full mb-6"><CheckCircle size={56} className="text-green-600" /></div><h3 className="text-2xl font-bold text-slate-800 mb-2">Booking Successful!</h3><p className="text-slate-600 text-lg">Check it in your "Schedule"</p></div></div>}
+
+                    <div className="flex-1 overflow-y-auto pb-24 scroll-smooth">
+                        {activeTab === 'home' && (
+                            <div className="p-6 animate-fade-in">
+                                <div className="flex justify-between items-center mb-8"><div><p className="text-slate-500 text-xl mb-1">Good morning,</p><h1 className="text-4xl font-bold text-slate-800">Mrs. Wang</h1></div><div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-700 ring-2 ring-emerald-50"><span className="font-bold text-2xl">W</span></div></div>
+                                <div className="bg-white p-6 rounded-3xl shadow-sm mb-8 border border-slate-100"><h3 className="text-xl font-bold text-slate-800 mb-3 flex items-center"><Heart className="text-red-500 mr-3" size={24} fill="currentColor" /> Daily Health Check-in</h3><p className="text-slate-500 text-base mb-5">How are you feeling today?</p><div className="flex justify-between px-2">{[{ icon: Smile, label: 'Happy', val: 'good', c: 'text-orange-500' }, { icon: Meh, label: 'Okay', val: 'ok', c: 'text-blue-500' }, { icon: Frown, label: 'Unwell', val: 'bad', c: 'text-slate-400' }].map((m, i) => <button key={i} onClick={() => setHealthStatus(m.val)} className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all flex-1 ${healthStatus === m.val ? 'bg-slate-100 scale-105' : ''}`}><m.icon size={48} className={healthStatus === m.val ? m.c : 'text-slate-300'} /><span className={`text-base ${healthStatus === m.val ? 'font-bold text-slate-700' : 'text-slate-400'}`}>{m.label}</span></button>)}</div></div>
+                                <h2 className="text-2xl font-bold text-slate-800 mb-5 flex items-center"><Clock className="mr-3 text-emerald-600" size={28} /> Today's Schedule</h2>
+                                <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-6 rounded-3xl shadow-lg text-white mb-8 transform active:scale-[0.99] transition-transform"><div className="flex gap-5 items-center"><div className="bg-white/20 p-4 rounded-2xl backdrop-blur-sm"><Calendar size={36} /></div><div><h3 className="text-2xl font-bold mb-1">Online Gardening Class</h3><p className="text-emerald-100 text-xl">10:30 AM - 11:30 AM</p></div></div><div className="mt-5 pt-5 border-t border-white/20 flex justify-between items-center"><span className="text-base text-emerald-100 font-medium">Starts in 30 mins</span><button onClick={openLiveRoom} className="bg-white text-emerald-700 px-6 py-2.5 rounded-full font-bold text-base shadow-sm active:scale-95 transition-transform hover:bg-emerald-50">Enter Room</button></div></div>
+                                <div onClick={() => openDetail(ACTIVITIES.find(a => a.id === 5))} className="bg-blue-50 p-5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-blue-100 transition-colors"><div className="flex items-center gap-4"><MessageCircle className="text-blue-600" size={28} /><div><p className="font-bold text-blue-900 text-lg">Community Notice</p><p className="text-blue-700 text-base mt-0.5">Australia Day BBQ Party...</p></div></div><ChevronRight className="text-blue-400" size={24} /></div>
+                            </div>
+                        )}
+
+                        {activeTab === 'activities' && (
+                            <div className="p-6 animate-fade-in">
+                                <h1 className="text-3xl font-bold text-slate-800 mb-8">Activities</h1>
+                                <div className="flex gap-5 mb-8">
+                                    <div onClick={openTier1List} className="flex-1 bg-orange-100 p-5 rounded-3xl flex flex-col items-center gap-3 cursor-pointer hover:bg-orange-200 transition-colors shadow-sm"><Layers size={40} className="text-orange-600" /><span className="font-bold text-orange-900 text-lg">Basic</span><span className="text-sm text-orange-700 font-medium">Tier 1: Skills</span></div>
+                                    <div onClick={openTier2List} className="flex-1 bg-purple-100 p-5 rounded-3xl flex flex-col items-center gap-3 cursor-pointer hover:bg-purple-200 transition-colors shadow-sm"><Users size={40} className="text-purple-600" /><span className="font-bold text-purple-900 text-lg">Advanced</span><span className="text-sm text-purple-700 font-medium">Tier 2: Social</span></div>
+                                </div>
+                                <h2 className="text-2xl font-bold text-slate-700 mb-5">Recommended</h2>
+                                <div className="space-y-5">{ACTIVITIES.filter(a => a.tier !== 'Tier 3').slice(0,2).map(a => <div key={a.id} onClick={() => openDetail(a)} className="bg-white rounded-3xl p-5 shadow-sm flex gap-5 border border-slate-100 active:scale-[0.98] transition-transform cursor-pointer"><ImageWithFallback src={a.image} className="w-28 h-28 rounded-2xl object-cover" alt={a.title} icon={a.icon} fallbackColor="bg-slate-100" /><div className="flex-1 flex flex-col justify-between py-1"><div><h3 className="font-bold text-slate-800 text-lg line-clamp-2 leading-tight mb-1">{a.title}</h3><span className={`${getTierBadgeStyle(a.tier)} text-xs px-2 py-0.5 rounded-md font-bold inline-block mb-2`}>{a.tier}</span><p className="text-slate-500 text-base">{a.time}</p></div><div className="flex justify-between items-end mt-2"><span className="text-sm bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg font-medium">{a.category}</span><button className="bg-emerald-600 text-white px-5 py-2 rounded-full text-sm font-bold shadow-sm">{schedule.some(s => s.activityId === a.id) ? 'Booked' : 'Book'}</button></div></div></div>)}</div>
+                            </div>
+                        )}
+
+                        {activeTab === 'premium' && (
+                            <div className="p-6 animate-fade-in">
+                                <div className="flex items-center gap-3 mb-2"><Crown size={32} className="text-yellow-500 fill-current" /><h1 className="text-3xl font-bold text-slate-800">Flagship</h1></div><p className="text-slate-500 text-lg mb-8 pl-1">Tier 3: Premium Experiences</p>
+                                <div className="space-y-8">{ACTIVITIES.filter(a => a.tier === 'Tier 3').map(a => <div key={a.id} className="bg-white rounded-3xl overflow-hidden shadow-md border border-slate-100 hover:shadow-lg transition-shadow"><div className="relative h-64"><ImageWithFallback src={a.image} className="w-full h-full object-cover" alt={a.title} icon={a.icon} fallbackColor="bg-yellow-50" /><div className="absolute top-5 right-5 bg-yellow-400 text-yellow-900 px-4 py-1.5 rounded-full text-base font-bold shadow-sm">Tier 3 Premium</div></div><div className="p-6"><h2 className="text-2xl font-bold text-slate-800 mb-3">{a.title}</h2><p className="text-slate-600 text-lg mb-5 line-clamp-2">{a.description}</p><div className="flex items-center justify-between"><div><span className="text-3xl font-bold text-emerald-700">{a.price}</span><span className="text-slate-400 text-base ml-1">/pp</span></div><button onClick={() => openDetail(a)} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-transform">View Details</button></div></div></div>)}</div>
+                                <div className="bg-slate-800 rounded-3xl p-6 text-white flex items-center justify-between mt-10 shadow-lg"><div className="flex items-center gap-5"><div className="bg-white/10 p-4 rounded-full"><CreditCard size={32} /></div><div><p className="font-bold text-xl">My Tickets</p><p className="text-slate-300 text-base mt-1">{premiumTickets.length > 0 ? `${premiumTickets.length} active e-tickets` : "No active e-tickets"}</p></div></div><ChevronRight className="text-slate-400" size={28} /></div>
+                            </div>
+                        )}
+
+                        {activeTab === 'community' && (
+                            <div className="p-6 animate-fade-in">
+                                <h1 className="text-3xl font-bold text-slate-800 mb-8">Community</h1>
+                                <div className="bg-pink-50 p-6 rounded-3xl mb-6 flex items-center gap-5 shadow-sm border border-pink-100"><div className="bg-pink-100 p-4 rounded-full text-pink-500"><Smile size={40} /></div><div className="flex-1"><h3 className="font-bold text-pink-900 text-xl">Find a Buddy</h3><p className="text-pink-700 text-base mt-2 leading-relaxed">System found Mr. Zhang also likes <b>Gardening</b>!</p></div><button onClick={() => setBuddyStatus('sent')} disabled={buddyStatus === 'sent'} className={`px-5 py-2.5 rounded-full text-base font-bold shadow-sm transition-colors ${buddyStatus === 'sent' ? 'bg-slate-200 text-slate-500' : 'bg-pink-500 text-white'}`}>{buddyStatus === 'sent' ? 'Sent!' : 'Say Hi'}</button></div>
+                                <div onClick={openHostActivity} className="bg-purple-50 p-4 rounded-3xl mb-10 flex items-center gap-4 cursor-pointer hover:bg-purple-100 transition-colors border border-purple-100 active:scale-95"><div className="bg-purple-100 p-3 rounded-full text-purple-600"><PenTool size={24} /></div><div className="flex-1"><h3 className="font-bold text-purple-900 text-lg">Host an Activity</h3><p className="text-purple-700 text-sm">Have a skill? Lead a workshop!</p></div><ChevronRight className="text-purple-400" /></div>
+                                <h2 className="text-2xl font-bold text-slate-800 mb-5">Neighborhood Circle</h2>
+                                <div className="space-y-6">{posts.map(p => <div key={p.id} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100"><div className="flex items-center gap-4 mb-4"><ImageWithFallback src={p.avatar} className="w-12 h-12 rounded-full bg-slate-100 object-cover" alt="avatar" icon={User} fallbackColor="bg-slate-200" /><div><p className="font-bold text-slate-800 text-lg">{p.user}</p><p className="text-sm text-slate-400">{p.time}</p></div></div><p className="text-slate-700 text-xl mb-4 leading-relaxed">{p.content}</p>{p.image && <div className="w-full h-56 rounded-2xl overflow-hidden mb-4"><ImageWithFallback src={p.image} className="w-full h-full object-cover" alt="post" icon={ImageIcon} fallbackColor="bg-slate-100" /></div>}<div className="flex items-center gap-6 border-t border-slate-50 pt-4"><button onClick={() => toggleLike(p.id)} className={`flex items-center gap-2 transition-colors ${p.isLiked ? 'text-red-500' : 'text-slate-500 hover:text-red-500'}`}><ThumbsUp size={22} fill={p.isLiked ? "currentColor" : "none"} /><span className="text-base font-medium">{p.likes}</span></button><button className="flex items-center gap-2 text-slate-500 hover:text-blue-500 transition-colors"><MessageCircle size={22} /><span className="text-base font-medium">Comment</span></button></div></div>)}</div>
+                            </div>
+                        )}
+
+                        {activeTab === 'profile' && (
+                            <div className="p-6 animate-fade-in">
+                                <div className="flex items-center gap-6 mb-10"><div className="w-24 h-24 bg-slate-200 rounded-full overflow-hidden ring-4 ring-white shadow-md flex items-center justify-center text-slate-400 font-bold text-3xl"><ImageWithFallback src="https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=800&auto=format&fit=crop&q=60" className="w-full h-full object-cover" alt="avatar" icon={User} fallbackColor="bg-slate-200" /></div><div><h2 className="text-3xl font-bold text-slate-800">Mrs. Wang</h2><p className="text-slate-500 text-xl mt-1">Ever Green Gold Member</p></div></div>
+                                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 mb-8"><h3 className="font-bold text-slate-800 text-xl mb-5 flex items-center gap-3"><Award className="text-yellow-500" size={28} /> My Badges</h3><div className="flex gap-6"><div className="flex flex-col items-center"><div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600 mb-2"><FileText size={28} /></div><span className="text-sm text-slate-600 font-medium">Learning Star</span></div><div className="flex flex-col items-center"><div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-2"><Users size={28} /></div><span className="text-sm text-slate-600 font-medium">Social Star</span></div></div></div>
+                                <div className="grid grid-cols-2 gap-4 mb-8"><div onClick={() => handleCall("Health Assistant")} className="bg-blue-500 rounded-3xl p-5 text-white shadow-lg flex flex-col justify-between h-32 active:scale-[0.98] transition-transform cursor-pointer"><PhoneCall size={32} fill="currentColor" className="opacity-80" /><div><h3 className="text-xl font-bold">Call Nurse</h3><p className="text-blue-100 text-sm">Health Support</p></div></div><div onClick={openAdminService} className="bg-purple-500 rounded-3xl p-5 text-white shadow-lg flex flex-col justify-between h-32 active:scale-[0.98] transition-transform cursor-pointer"><Briefcase size={32} fill="currentColor" className="opacity-80" /><div><h3 className="text-xl font-bold">Concierge</h3><p className="text-purple-100 text-sm">Admin Help</p></div></div></div>
+                                <div className="bg-white rounded-3xl shadow-sm overflow-hidden mb-8">
+                                    <div onClick={openDataReport} className="flex items-center p-6 border-b border-slate-50 cursor-pointer active:bg-slate-50"><BarChart3 className="text-blue-500 mr-5" size={28} /><span className="text-xl text-slate-700 flex-1 font-medium">My Data Report</span><ChevronRight className="text-slate-300" size={24} /></div>
+                                    <div onClick={openFontSettings} className="flex items-center p-6 border-b border-slate-50 cursor-pointer active:bg-slate-50"><Type className="text-slate-500 mr-5" size={28} /><span className="text-xl text-slate-700 flex-1 font-medium">Text Size</span><span className="text-slate-400 text-base mr-3">{fontSize}</span><ChevronRight className="text-slate-300" size={24} /></div>
+                                    <div onClick={openFamilyAccess} className="flex items-center p-6 cursor-pointer active:bg-slate-50"><Users className="text-pink-500 mr-5" size={28} /><span className="text-xl text-slate-700 font-medium">Family Access</span><ChevronRight className="text-slate-300" size={24} /></div>
+                                </div>
+                                <button onClick={() => setShowSplash(true)} className="w-full text-center text-slate-400 text-lg py-4 hover:text-slate-600">Log Out</button>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around items-center h-24 px-2 pb-4 z-20 shadow-[0_-5px_20px_rgba(0,0,0,0.03)]">
+                        <NavItem id="home" icon={Home} label="Home" />
+                        <NavItem id="activities" icon={BookOpen} label="Activities" />
+                        <NavItem id="premium" icon={Star} label="Flagship" />
+                        <NavItem id="community" icon={Users} label="Community" />
+                        <NavItem id="profile" icon={User} label="Profile" />
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<EverGreenApp />);
+    </script>
+</body>
+</html>
